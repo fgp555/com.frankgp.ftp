@@ -3,7 +3,10 @@ package com.frankgp.ftp.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Environment
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -28,7 +31,8 @@ fun MainScreen(
     uiState: FtpServerUiState,
     onToggleServer: (Boolean, Int, String, String, String, Boolean) -> Unit,
     onRequestManageStorage: () -> Unit,
-    onRefreshIp: () -> Unit
+    onRefreshIp: () -> Unit,
+    onRequestLocationPermission: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -100,7 +104,20 @@ fun MainScreen(
                             Text(
                                 text = "Red: ${uiState.networkName}",
                                 fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.clickable {
+                                    try {
+                                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                            data = Uri.parse("package:${context.packageName}")
+                                        }
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {
+                                        try {
+                                            val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                                            context.startActivity(intent)
+                                        } catch (_: Exception) {}
+                                    }
+                                }
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(

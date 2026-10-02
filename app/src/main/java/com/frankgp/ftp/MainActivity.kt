@@ -3,10 +3,12 @@ package com.frankgp.ftp
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.core.app.ActivityCompat
 import com.frankgp.ftp.data.FtpServerManager
 import com.frankgp.ftp.service.FtpServerService
 import com.frankgp.ftp.ui.MainScreen
@@ -34,7 +37,7 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { _ ->
-        // Permissions handled
+        refreshIpAddress()
     }
 
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
@@ -69,6 +72,9 @@ class MainActivity : ComponentActivity() {
                         },
                         onRefreshIp = {
                             refreshIpAddress()
+                        },
+                        onRequestLocationPermission = {
+                            requestLocationPermission()
                         }
                     )
                 }
@@ -107,7 +113,34 @@ class MainActivity : ComponentActivity() {
                         }
                     } catch (_: Exception) {}
 
-                    return if (ssid.isNotEmpty()) "Wi-Fi: $ssid" else "Red Wi-Fi"
+                    if (ssid.isEmpty() || ssid == "<unknown ssid>") {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            try {
+                                val transportInfo = capabilities.transportInfo
+                                if (transportInfo is WifiInfo) {
+                                    val s = transportInfo.ssid
+                                    if (s != null && s != "<unknown ssid>") {
+                                        ssid = s.removeSurrounding("\"")
+                                    }
+                                }
+                            } catch (_: Exception) {}
+                        }
+                    }
+
+                    if (ssid.isNotEmpty() && ssid != "<unknown ssid>") {
+                        return "Wi-Fi: $ssid"
+                    } else {
+                        val hasLocationPermission = ActivityCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        return if (!hasLocationPermission) {
+                            "Wi-Fi (Toca para dar permiso de ubicación)"
+                        } else {
+                            "Wi-Fi (Activa Ubicación GPS)"
+                        }
+                    }
                 }
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
                     return "Datos Móviles"
@@ -120,6 +153,15 @@ class MainActivity : ComponentActivity() {
             e.printStackTrace()
         }
         return "Desconocida"
+    }
+
+    private fun requestLocationPermission() {
+        requestPermissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
     }
 
     private fun registerNetworkCallback() {
@@ -161,7 +203,8 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.ACCESS_NETWORK_STATE,
             Manifest.permission.READ_EXTERNAL_STORAGE,
             Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            Manifest.permission.ACCESS_FINE_LOCATION
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
